@@ -1,0 +1,27 @@
+[tools]
+go = "1.27"
+goreleaser = "latest"
+
+[tasks.fmt]
+description = "Format Go code"
+run = "gofmt -w ."
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks.lint]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks.build]
+description = "Build rocketchat"
+run = "mkdir -p bin && go build -trimpath -o bin/rocketchat ."
+
+[tasks.install]
+description = "Install rocketchat into GOPATH/bin"
+run = "go install ."
+
+[tasks.release]
+description = "Create a GoReleaser release"
+run = "goreleaser release --clean"
