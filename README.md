@@ -167,16 +167,30 @@ Message IDs are always shown in tabular history/search output so the result can 
 
 ## Messages
 
-Send:
+Send to a public channel or private group by prefixing the target with `:`:
 
 ```bash
-rocketchat message send platform "Deployment completed"
+rocketchat message send :platform "Deployment completed"
 ```
 
-Or stdin:
+An unprefixed target is a direct message recipient. Usernames and email addresses are supported:
 
 ```bash
-cat report.txt | rocketchat message send platform -
+rocketchat message send vadim "Deployment completed"
+rocketchat message send vadim@example.com "Deployment completed"
+```
+
+For generated direct-message text:
+
+```bash
+cat report.txt | rocketchat message send vadim -
+```
+
+Edit a message with literal or stdin replacement text:
+
+```bash
+rocketchat message edit CeXwh5eBbdrtvnqG6 "Deployment completed successfully"
+cat corrected-message.txt | rocketchat message edit CeXwh5eBbdrtvnqG6 -
 ```
 
 Get/search:
@@ -297,8 +311,10 @@ The implementation intentionally uses a small direct HTTP client rather than a l
 - `channels.history` / `groups.history` are hidden behind `channel history`.
 - `channels.members` / `groups.members` are hidden behind `channel members`.
 - `chat.getMessage` + `chat.sendMessage` implement smart replies.
+- `dm.create` + `chat.sendMessage` implement direct messages.
+- `chat.getMessage` + `chat.update` implement message edits.
 - `chat.getThreadMessages` implements threads.
 - `chat.search` implements per-channel message search.
 - `directory?type=users&text=...` implements user search without deprecated unsafe query syntax.
 
-The next logical versions are DMs/files/reactions, then administrative mutation commands.
+The next logical versions are files/reactions, then administrative mutation commands.

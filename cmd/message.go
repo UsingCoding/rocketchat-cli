@@ -12,7 +12,7 @@ import (
 
 func newMessageCmd(o *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{Use: "message", Short: "Read and send messages"}
-	cmd.AddCommand(newMessageGetCmd(o), newMessageSendCmd(o), newMessageReplyCmd(o), newMessageThreadCmd(o), newMessageSearchCmd(o), newMessageDeleteCmd(o))
+	cmd.AddCommand(newMessageGetCmd(o), newMessageSendCmd(o), newMessageEditCmd(o), newMessageReplyCmd(o), newMessageThreadCmd(o), newMessageSearchCmd(o), newMessageDeleteCmd(o))
 	return cmd
 }
 
@@ -31,7 +31,10 @@ func newMessageGetCmd(o *rootOptions) *cobra.Command {
 }
 
 func newMessageSendCmd(o *rootOptions) *cobra.Command {
-	cmd := &cobra.Command{Use: "send <channel> <text|->", Args: cobra.ExactArgs(2), Short: "Send a message", RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: "send <target> <text|->", Args: cobra.ExactArgs(2), Short: "Send a message", RunE: func(cmd *cobra.Command, args []string) error {
+		if args[0] == ":" {
+			return usageErr("channel target after ':' is empty")
+		}
 		text, err := readText(cmd, args[1])
 		if err != nil {
 			return err
@@ -45,6 +48,25 @@ func newMessageSendCmd(o *rootOptions) *cobra.Command {
 			return classify(err)
 		}
 		return render(cmd, o, client, m, func() { fmt.Fprintf(cmd.OutOrStdout(), "Message sent: %s\n", m.ID) })
+	}}
+	return cmd
+}
+
+func newMessageEditCmd(o *rootOptions) *cobra.Command {
+	cmd := &cobra.Command{Use: "edit <message-id> <text|->", Args: cobra.ExactArgs(2), Short: "Edit a message", RunE: func(cmd *cobra.Command, args []string) error {
+		text, err := readText(cmd, args[1])
+		if err != nil {
+			return err
+		}
+		svc, client, err := buildService(o)
+		if err != nil {
+			return err
+		}
+		m, err := svc.Edit(cmd.Context(), args[0], text)
+		if err != nil {
+			return classify(err)
+		}
+		return render(cmd, o, client, m, func() { fmt.Fprintf(cmd.OutOrStdout(), "Message updated: %s\n", m.ID) })
 	}}
 	return cmd
 }

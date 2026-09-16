@@ -41,16 +41,22 @@ History/search output includes message IDs. Use those IDs for `message get`, `re
 rocketchat message get <message-id> --json
 rocketchat message search <channel> <text> --json
 rocketchat message thread <message-id> --all --json
-rocketchat message send <channel> "text" --json
+rocketchat message send :<channel> "text" --json
+rocketchat message send <username|email> "text" --json
+rocketchat message edit <message-id> "replacement text" --json
 rocketchat message reply <message-id> "text" --json
 ```
+
+Prefix every public-channel or private-group target with `:`. An unprefixed `message send` target is a direct-message user; it resolves usernames, user IDs, and email addresses and must not be used for channels.
 
 `message reply` accepts either the thread root or any reply in the thread. The CLI resolves the actual thread root automatically.
 
 For generated or multiline text, use stdin:
 
 ```bash
-some-command | rocketchat message send <channel> - --json
+some-command | rocketchat message send :<channel> - --json
+some-command | rocketchat message send <username> - --json
+some-command | rocketchat message edit <message-id> - --json
 some-command | rocketchat message reply <message-id> - --json
 ```
 

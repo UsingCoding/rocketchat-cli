@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 )
@@ -29,6 +30,33 @@ func (c *Client) SendMessage(ctx context.Context, roomID, text, threadID string,
 		Message apiMessage `json:"message"`
 	}
 	err := c.post(ctx, "chat.sendMessage", map[string]any{"message": msg}, &out)
+	return out.Message, err
+}
+
+func (c *Client) CreateDM(ctx context.Context, username string) (string, error) {
+	var out struct {
+		Room struct {
+			ID string `json:"rid"`
+		} `json:"room"`
+	}
+	if err := c.post(ctx, "dm.create", map[string]string{"username": username}, &out); err != nil {
+		return "", err
+	}
+	if out.Room.ID == "" {
+		return "", fmt.Errorf("dm.create response missing room.rid")
+	}
+	return out.Room.ID, nil
+}
+
+func (c *Client) UpdateMessage(ctx context.Context, roomID, messageID, text string) (apiMessage, error) {
+	var out struct {
+		Message apiMessage `json:"message"`
+	}
+	err := c.post(ctx, "chat.update", map[string]string{
+		"roomId": roomID,
+		"msgId":  messageID,
+		"text":   text,
+	}, &out)
 	return out.Message, err
 }
 

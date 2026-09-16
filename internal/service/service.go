@@ -149,12 +149,37 @@ func (s *Service) Message(ctx context.Context, id string) (model.Message, error)
 	return toMessage(m), err
 }
 
-func (s *Service) Send(ctx context.Context, channel, text string) (model.Message, error) {
-	r, err := s.ResolveRoom(ctx, channel)
+func (s *Service) Send(ctx context.Context, target, text string) (model.Message, error) {
+	if strings.HasPrefix(target, ":") {
+		r, err := s.ResolveRoom(ctx, strings.TrimPrefix(target, ":"))
+		if err != nil {
+			return model.Message{}, err
+		}
+		m, err := s.API.SendMessage(ctx, r.ID, text, "", false)
+		return toMessage(m), err
+	}
+
+	u, err := s.User(ctx, target)
+	if err != nil {
+		if api.IsNotFound(err) {
+			return model.Message{}, fmt.Errorf("%q was not found as a user. If this is a channel, prefix it with ':', for example: rocketchat message send :<channel> <text>: %w", target, err)
+		}
+		return model.Message{}, err
+	}
+	roomID, err := s.API.CreateDM(ctx, u.Username)
 	if err != nil {
 		return model.Message{}, err
 	}
-	m, err := s.API.SendMessage(ctx, r.ID, text, "", false)
+	m, err := s.API.SendMessage(ctx, roomID, text, "", false)
+	return toMessage(m), err
+}
+
+func (s *Service) Edit(ctx context.Context, messageID, text string) (model.Message, error) {
+	target, err := s.API.Message(ctx, messageID)
+	if err != nil {
+		return model.Message{}, err
+	}
+	m, err := s.API.UpdateMessage(ctx, target.RoomID, target.ID, text)
 	return toMessage(m), err
 }
 
