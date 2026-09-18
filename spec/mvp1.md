@@ -160,5 +160,5 @@ MVP1 is complete when all three epics meet their acceptance criteria, command he
 ## Epic status
 
 - [x] Epic 1 — Core workspace and channel messaging
-- [ ] Epic 2 — Send a direct message to one user
-- [ ] Epic 3 — Edit a message
+- [x] Epic 2 — Send a direct message to one user
+- [x] Epic 3 — Edit a message
