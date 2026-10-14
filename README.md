@@ -29,6 +29,10 @@ rocketchat
 │   ├── list
 │   ├── members
 │   └── history
+├── dm
+│   ├── get
+│   ├── list
+│   └── history
 ├── message
 │   ├── get
 │   ├── send
@@ -164,6 +168,21 @@ rocketchat channel history platform --before 30m
 ```
 
 Message IDs are always shown in tabular history/search output so the result can immediately be used by message commands.
+
+## Direct messages
+
+Browse existing one-to-one conversations without creating one:
+
+```bash
+rocketchat dm list
+rocketchat dm list --all
+rocketchat dm get alice
+rocketchat dm get room-id-here
+rocketchat dm history alice --limit 50
+rocketchat dm history room-id-here --since 2h
+```
+
+`dm` only discovers joined one-to-one conversations. It does not create DMs and excludes group DMs.
 
 ## Messages
 

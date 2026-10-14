@@ -79,6 +79,25 @@ func Channel(w io.Writer, c model.Channel) {
 	fmt.Fprintf(w, "Unread:    %d\n", c.Unread)
 }
 
+func DirectMessages(w io.Writer, messages []model.DirectMessage) {
+	t := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(t, "ID\tUSER\tMESSAGES\tUNREAD\tLAST ACTIVITY")
+	for _, dm := range messages {
+		fmt.Fprintf(t, "%s\t%s\t%d\t%d\t%s\n", dm.ID, dm.OtherParticipant.Username, dm.MessageCount, dm.Unread, formatTime(dm.LastActivity))
+	}
+	_ = t.Flush()
+}
+
+func DirectMessage(w io.Writer, dm model.DirectMessage) {
+	fmt.Fprintf(w, "ID:             %s\n", dm.ID)
+	fmt.Fprintf(w, "User:           %s\n", dm.OtherParticipant.Username)
+	fmt.Fprintf(w, "Messages:       %d\n", dm.MessageCount)
+	fmt.Fprintf(w, "Unread:         %d\n", dm.Unread)
+	if !dm.LastActivity.IsZero() {
+		fmt.Fprintf(w, "Last activity:  %s\n", dm.LastActivity.Format(time.RFC3339))
+	}
+}
+
 func Messages(w io.Writer, messages []model.Message) {
 	t := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(t, "ID\tTIME\tUSER\tMESSAGE")

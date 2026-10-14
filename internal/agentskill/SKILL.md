@@ -35,6 +35,18 @@ rocketchat channel history <name|id> --since 2h --json
 
 History/search output includes message IDs. Use those IDs for `message get`, `reply`, and `thread`.
 
+## Direct messages
+
+```bash
+rocketchat dm list --json
+rocketchat dm list --all --json
+rocketchat dm get <username|room-id> --json
+rocketchat dm history <username|room-id> --limit 50 --json
+rocketchat dm history <username|room-id> --since 2h --json
+```
+
+`dm` discovers existing joined one-to-one conversations only. It never creates a DM and does not include group DMs.
+
 ## Messages
 
 ```bash

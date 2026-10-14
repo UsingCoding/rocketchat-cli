@@ -204,4 +204,4 @@ MVP1 is complete when all four epics meet their acceptance criteria, command hel
 - [x] Epic 1 — Core workspace and channel messaging
 - [x] Epic 2 — Send a direct message to one user
 - [x] Epic 3 — Edit a message
-- [ ] Epic 4 — Browse one-to-one direct messages
+- [x] Epic 4 — Browse one-to-one direct messages

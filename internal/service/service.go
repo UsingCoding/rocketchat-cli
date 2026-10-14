@@ -72,22 +72,28 @@ func (s *Service) SearchUsers(ctx context.Context, text string, offset, limit in
 	}
 }
 
-func (s *Service) ResolveRoom(ctx context.Context, identifier string) (api.RoomDTO, error) {
-	r, err := s.API.RoomInfo(ctx, "roomName", identifier)
-	if err != nil && api.IsNotFound(err) {
+func (s *Service) ResolveRoom(ctx context.Context, identifier string, desiredTypes ...string) (api.RoomDTO, error) {
+	key := "roomName"
+	if len(desiredTypes) == 1 && desiredTypes[0] == "d" {
+		key = "roomId"
+	}
+	r, err := s.API.RoomInfo(ctx, key, identifier)
+	if err != nil && key == "roomName" && api.IsNotFound(err) {
 		r, err = s.API.RoomInfo(ctx, "roomId", identifier)
 	}
 	if err != nil {
 		return api.RoomDTO{}, err
 	}
-	if r.Type != "c" && r.Type != "p" {
-		return api.RoomDTO{}, fmt.Errorf("room %q is not a public/private channel", identifier)
+	for _, desiredType := range desiredTypes {
+		if r.Type == desiredType {
+			return r, nil
+		}
 	}
-	return r, nil
+	return api.RoomDTO{}, fmt.Errorf("room %q has type %q, not one of %q", identifier, r.Type, desiredTypes)
 }
 
 func (s *Service) Channel(ctx context.Context, identifier string) (model.Channel, error) {
-	r, err := s.ResolveRoom(ctx, identifier)
+	r, err := s.ResolveRoom(ctx, identifier, "c", "p")
 	return toChannel(r), err
 }
 
@@ -112,8 +118,28 @@ func (s *Service) Channels(ctx context.Context, wantPublic, wantPrivate, unreadO
 	return out, nil
 }
 
+func (s *Service) DirectMessages(ctx context.Context, all bool) ([]model.DirectMessage, error) {
+	callerUsername, err := s.callerUsername(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.pageDirectMessages(ctx, callerUsername, all)
+}
+
+func (s *Service) DirectMessage(ctx context.Context, identifier string) (model.DirectMessage, error) {
+	callerUsername, err := s.callerUsername(ctx)
+	if err != nil {
+		return model.DirectMessage{}, err
+	}
+	room, err := s.resolveDirectMessage(ctx, identifier)
+	if err != nil {
+		return model.DirectMessage{}, err
+	}
+	return toDirectMessage(room, s.API.UserID(), callerUsername)
+}
+
 func (s *Service) ChannelMembers(ctx context.Context, identifier string, offset, limit int, all bool) ([]model.User, error) {
-	r, err := s.ResolveRoom(ctx, identifier)
+	r, err := s.ResolveRoom(ctx, identifier, "c", "p")
 	if err != nil {
 		return nil, err
 	}
@@ -136,11 +162,20 @@ func (s *Service) ChannelMembers(ctx context.Context, identifier string, offset,
 }
 
 func (s *Service) ChannelHistory(ctx context.Context, identifier string, o api.HistoryOptions) ([]model.Message, error) {
-	r, err := s.ResolveRoom(ctx, identifier)
+	r, err := s.ResolveRoom(ctx, identifier, "c", "p")
 	if err != nil {
 		return nil, err
 	}
 	messages, _, err := s.API.History(ctx, r.Type, r.ID, o)
+	return mapMessages(messages), err
+}
+
+func (s *Service) DirectMessageHistory(ctx context.Context, identifier string, o api.HistoryOptions) ([]model.Message, error) {
+	room, err := s.resolveDirectMessage(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	messages, _, err := s.API.DMHistory(ctx, room.ID, o)
 	return mapMessages(messages), err
 }
 
@@ -151,7 +186,7 @@ func (s *Service) Message(ctx context.Context, id string) (model.Message, error)
 
 func (s *Service) Send(ctx context.Context, target, text string) (model.Message, error) {
 	if strings.HasPrefix(target, ":") {
-		r, err := s.ResolveRoom(ctx, strings.TrimPrefix(target, ":"))
+		r, err := s.ResolveRoom(ctx, strings.TrimPrefix(target, ":"), "c", "p")
 		if err != nil {
 			return model.Message{}, err
 		}
@@ -236,7 +271,7 @@ func (s *Service) Thread(ctx context.Context, messageID string, offset, limit in
 }
 
 func (s *Service) SearchMessages(ctx context.Context, channel, text string, offset, limit int) ([]model.Message, error) {
-	r, err := s.ResolveRoom(ctx, channel)
+	r, err := s.ResolveRoom(ctx, channel, "c", "p")
 	if err != nil {
 		return nil, err
 	}
@@ -250,6 +285,112 @@ func (s *Service) DeleteMessage(ctx context.Context, messageID string) error {
 		return err
 	}
 	return s.API.DeleteMessage(ctx, m.RoomID, m.ID)
+}
+
+const dmPageSize = 50
+
+func (s *Service) pageDirectMessages(ctx context.Context, callerUsername string, all bool) ([]model.DirectMessage, error) {
+	var result []model.DirectMessage
+	for offset := 0; ; {
+		rooms, total, err := s.API.DMs(ctx, offset, dmPageSize)
+		if err != nil {
+			return nil, err
+		}
+		for _, room := range rooms {
+			if room.Type != "d" || room.UsersCount != 2 {
+				continue
+			}
+			dm, err := toDirectMessage(room, s.API.UserID(), callerUsername)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, dm)
+		}
+		offset += len(rooms)
+		if !all || len(rooms) == 0 || offset >= total {
+			return result, nil
+		}
+	}
+}
+
+func (s *Service) findJoinedDirectMessage(ctx context.Context, match func(api.RoomDTO) bool) (api.RoomDTO, bool, error) {
+	for offset := 0; ; {
+		rooms, total, err := s.API.DMs(ctx, offset, dmPageSize)
+		if err != nil {
+			return api.RoomDTO{}, false, err
+		}
+		for _, room := range rooms {
+			if room.Type == "d" && room.UsersCount == 2 && match(room) {
+				return room, true, nil
+			}
+		}
+		offset += len(rooms)
+		if len(rooms) == 0 || offset >= total {
+			return api.RoomDTO{}, false, nil
+		}
+	}
+}
+
+func (s *Service) callerUsername(ctx context.Context) (string, error) {
+	caller, err := s.API.Me(ctx)
+	if err != nil {
+		return "", err
+	}
+	if caller.Username == "" {
+		return "", fmt.Errorf("me response missing username")
+	}
+	return caller.Username, nil
+}
+func (s *Service) resolveDirectMessage(ctx context.Context, identifier string) (api.RoomDTO, error) {
+	room, err := s.ResolveRoom(ctx, identifier, "d")
+	if err == nil {
+		if err := validateOneToOneDirectMessage(room); err != nil {
+			return api.RoomDTO{}, err
+		}
+		room, found, err := s.findJoinedDirectMessage(ctx, func(candidate api.RoomDTO) bool {
+			return candidate.ID == room.ID
+		})
+		if err != nil {
+			return api.RoomDTO{}, err
+		}
+		if !found {
+			return api.RoomDTO{}, api.NotFound(fmt.Sprintf("joined direct message %q not found", identifier))
+		}
+		return room, nil
+	}
+	if !api.IsNotFound(err) {
+		return api.RoomDTO{}, err
+	}
+
+	room, found, err := s.findJoinedDirectMessage(ctx, func(candidate api.RoomDTO) bool {
+		return candidate.ID == identifier
+	})
+	if err != nil {
+		return api.RoomDTO{}, err
+	}
+	if found {
+		return room, nil
+	}
+
+	user, err := s.User(ctx, identifier)
+	if err != nil {
+		return api.RoomDTO{}, err
+	}
+	room, found, err = s.findJoinedDirectMessage(ctx, func(candidate api.RoomDTO) bool {
+		for _, id := range candidate.UserIDs {
+			if id == user.ID {
+				return true
+			}
+		}
+		return false
+	})
+	if err != nil {
+		return api.RoomDTO{}, err
+	}
+	if !found {
+		return api.RoomDTO{}, api.NotFound(fmt.Sprintf("joined direct message for %q not found", identifier))
+	}
+	return room, nil
 }
 
 func toUser(u api.UserDTO) model.User {
@@ -284,6 +425,70 @@ func toChannel(r api.RoomDTO) model.Channel {
 		name = r.FName
 	}
 	return model.Channel{ID: r.ID, Name: name, Type: t, Topic: r.Topic, MessageCount: r.Messages, MemberCount: r.UsersCount, Unread: r.Unread, Archived: r.Archived}
+}
+
+func validateOneToOneDirectMessage(r api.RoomDTO) error {
+	if r.Type != "d" || r.UsersCount != 2 {
+		return fmt.Errorf("room %q is not a one-to-one direct message", r.ID)
+	}
+	return nil
+}
+
+func toDirectMessage(r api.RoomDTO, callerID, callerUsername string) (model.DirectMessage, error) {
+	if err := validateOneToOneDirectMessage(r); err != nil {
+		return model.DirectMessage{}, err
+	}
+	otherID, err := otherParticipantID(r, callerID)
+	if err != nil {
+		return model.DirectMessage{}, err
+	}
+	if len(r.Usernames) != 2 {
+		return model.DirectMessage{}, fmt.Errorf("dm %q has invalid participant metadata", r.ID)
+	}
+	otherUsername := ""
+	for _, username := range r.Usernames {
+		if username == "" {
+			return model.DirectMessage{}, fmt.Errorf("dm %q has invalid participant metadata", r.ID)
+		}
+		if username != callerUsername {
+			if otherUsername != "" {
+				return model.DirectMessage{}, fmt.Errorf("dm %q has invalid participant metadata", r.ID)
+			}
+			otherUsername = username
+		}
+	}
+	if otherUsername == "" {
+		return model.DirectMessage{}, fmt.Errorf("dm %q has invalid participant metadata", r.ID)
+	}
+	return model.DirectMessage{
+		ID:               r.ID,
+		OtherParticipant: model.Participant{ID: otherID, Username: otherUsername},
+		MessageCount:     r.Messages,
+		Unread:           r.Unread,
+		LastActivity:     r.LastActivity,
+	}, nil
+}
+
+func otherParticipantID(r api.RoomDTO, callerID string) (string, error) {
+	if len(r.UserIDs) != 2 {
+		return "", fmt.Errorf("dm %q has invalid participant metadata", r.ID)
+	}
+	otherID := ""
+	for _, id := range r.UserIDs {
+		if id == "" {
+			return "", fmt.Errorf("dm %q has invalid participant metadata", r.ID)
+		}
+		if id != callerID {
+			if otherID != "" {
+				return "", fmt.Errorf("dm %q has invalid participant metadata", r.ID)
+			}
+			otherID = id
+		}
+	}
+	if otherID == "" {
+		return "", fmt.Errorf("dm %q has invalid participant metadata", r.ID)
+	}
+	return otherID, nil
 }
 
 func toMessage(m api.MessageDTO) model.Message {

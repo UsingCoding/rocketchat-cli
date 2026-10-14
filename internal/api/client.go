@@ -20,6 +20,10 @@ type Error struct {
 	Message    string
 }
 
+func NotFound(message string) error {
+	return &Error{StatusCode: http.StatusNotFound, Message: message}
+}
+
 func (e *Error) Error() string {
 	if e.ErrorType != "" {
 		return fmt.Sprintf("Rocket.Chat API: %s (%s)", e.Message, e.ErrorType)
@@ -50,6 +54,8 @@ func New(baseURL, userID, token string, timeout time.Duration) *Client {
 		http:    &http.Client{Timeout: timeout},
 	}
 }
+
+func (c *Client) UserID() string { return c.userID }
 
 func (c *Client) LastRaw() []byte {
 	c.mu.Lock()

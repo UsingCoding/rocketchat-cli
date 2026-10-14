@@ -20,7 +20,7 @@ func TestMessageSendRejectsEmptyChannelTargetBeforeHTTP(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := executeMessageCommand(t, server.URL, "", "message", "send", ":", "-")
+	_, err := executeCommand(t, server.URL, "", "message", "send", ":", "-")
 	if clierr.ExitCode(err) != int(clierr.CodeUsage) {
 		t.Fatalf("exit code = %d, error = %v", clierr.ExitCode(err), err)
 	}
@@ -41,7 +41,7 @@ func TestMessageCommandsRejectEmptyStdinBeforeHTTP(t *testing.T) {
 		{"message", "edit", "message-id", "-"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			_, err := executeMessageCommand(t, server.URL, "", args...)
+			_, err := executeCommand(t, server.URL, "", args...)
 			if clierr.ExitCode(err) != int(clierr.CodeUsage) {
 				t.Fatalf("exit code = %d, error = %v", clierr.ExitCode(err), err)
 			}
@@ -62,7 +62,7 @@ func TestMessageSendMissingUserReturnsChannelAdvice(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := executeMessageCommand(t, server.URL, "", "message", "send", "platform", "hello")
+	_, err := executeCommand(t, server.URL, "", "message", "send", "platform", "hello")
 	if clierr.ExitCode(err) != int(clierr.CodeNotFound) {
 		t.Fatalf("exit code = %d, error = %v", clierr.ExitCode(err), err)
 	}
@@ -114,7 +114,7 @@ func TestMessageRawOutputUsesFinalMutationResponse(t *testing.T) {
 			}))
 			defer server.Close()
 
-			output, err := executeMessageCommand(t, server.URL, "", append([]string{"--raw"}, tt.args...)...)
+			output, err := executeCommand(t, server.URL, "", append([]string{"--raw"}, tt.args...)...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -142,7 +142,7 @@ func TestMessageEditHumanAndNormalizedJSONOutput(t *testing.T) {
 	}))
 	defer server.Close()
 
-	output, err := executeMessageCommand(t, server.URL, "", "message", "edit", "caller-id", "new")
+	output, err := executeCommand(t, server.URL, "", "message", "edit", "caller-id", "new")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestMessageEditHumanAndNormalizedJSONOutput(t *testing.T) {
 		t.Fatalf("human output = %q", output)
 	}
 
-	output, err = executeMessageCommand(t, server.URL, "", "--json", "message", "edit", "caller-id", "new")
+	output, err = executeCommand(t, server.URL, "", "--json", "message", "edit", "caller-id", "new")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestMessageEditHumanAndNormalizedJSONOutput(t *testing.T) {
 	}
 }
 
-func executeMessageCommand(t *testing.T, serverURL, stdin string, args ...string) (string, error) {
+func executeCommand(t *testing.T, serverURL, stdin string, args ...string) (string, error) {
 	t.Helper()
 	cmd := newRootCmd()
 	var stdout bytes.Buffer

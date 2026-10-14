@@ -24,6 +24,19 @@ type Channel struct {
 	Archived     bool   `json:"archived,omitempty"`
 }
 
+type Participant struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+}
+
+type DirectMessage struct {
+	ID               string      `json:"id"`
+	OtherParticipant Participant `json:"other_participant"`
+	MessageCount     int         `json:"message_count,omitempty"`
+	Unread           int         `json:"unread,omitempty"`
+	LastActivity     time.Time   `json:"last_activity,omitempty"`
+}
+
 type Author struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`

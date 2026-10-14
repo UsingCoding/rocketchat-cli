@@ -23,6 +23,20 @@ func (c *Client) Rooms(ctx context.Context) ([]apiRoom, error) {
 	return out.Update, err
 }
 
+func (c *Client) DMs(ctx context.Context, offset, count int) ([]apiRoom, int, error) {
+	var out struct {
+		IMs   []apiRoom `json:"ims"`
+		Total int       `json:"total"`
+	}
+	q := url.Values{
+		"offset": []string{strconv.Itoa(offset)},
+		"count":  []string{strconv.Itoa(count)},
+		"sort":   []string{`{"_updatedAt":-1}`},
+	}
+	err := c.get(ctx, "dm.list", q, &out)
+	return out.IMs, out.Total, err
+}
+
 func (c *Client) Members(ctx context.Context, roomType, roomID string, offset, count int) ([]apiUser, int, error) {
 	endpoint := "channels.members"
 	if roomType == "p" {
@@ -69,5 +83,25 @@ func (c *Client) History(ctx context.Context, roomType, roomID string, o History
 		q.Set("latest", o.Latest)
 	}
 	err := c.get(ctx, endpoint, q, &out)
+	return out.Messages, out.Total, err
+}
+
+func (c *Client) DMHistory(ctx context.Context, roomID string, o HistoryOptions) ([]apiMessage, int, error) {
+	var out struct {
+		Messages []apiMessage `json:"messages"`
+		Total    int          `json:"total"`
+	}
+	q := url.Values{
+		"roomId": []string{roomID},
+		"offset": []string{strconv.Itoa(o.Offset)},
+		"count":  []string{strconv.Itoa(o.Count)},
+	}
+	if o.Oldest != "" {
+		q.Set("oldest", o.Oldest)
+	}
+	if o.Latest != "" {
+		q.Set("latest", o.Latest)
+	}
+	err := c.get(ctx, "dm.messages", q, &out)
 	return out.Messages, out.Total, err
 }
