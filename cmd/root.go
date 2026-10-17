@@ -68,7 +68,7 @@ func newRootCmd() *cobra.Command {
 		newChannelCmd(o),
 		newDMCmd(o),
 		newMessageCmd(o),
-		newSkillCmd(),
+		newSkillCmd(o),
 	)
 	return cmd
 }

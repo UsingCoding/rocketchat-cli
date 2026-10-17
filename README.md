@@ -41,6 +41,10 @@ rocketchat
 │   ├── search
 │   └── delete
 └── skill
+    ├── list
+    ├── install
+    ├── update
+    └── remove
 ```
 
 ## Build
@@ -279,18 +283,27 @@ rocketchat channel history platform --raw
 
 ## Agent skill
 
-The binary embeds a concise skill describing the safe/agent-friendly command surface:
+The binary embeds the `rocketchat-cli` skill bundle, including command and safe-workflow references. Manage it without Rocket.Chat configuration, credentials, or network access:
 
 ```bash
-rocketchat skill
+rocketchat skill list
+rocketchat skill install
+rocketchat skill install --project
+rocketchat skill update
+rocketchat skill remove
 ```
 
-For example:
+| Target | Global root | Project root (`--project`) |
+| --- | --- | --- |
+| `claude` | `~/.claude/skills` | `.claude/skills` |
+| `codex` | `~/.codex/skills` | `.codex/skills` |
+| `cursor` | `~/.cursor/skills` | `.cursor/skills` |
+| `opencode` | `~/.config/opencode/skills` | `.opencode/skills` |
+| `agents` | `~/.agents/skills` | `.agents/skills` |
 
-```bash
-mkdir -p ~/.config/opencode/skills/rocketchat-cli
-rocketchat skill > ~/.config/opencode/skills/rocketchat-cli/SKILL.md
-```
+Global directories are the default; `--project` resolves directories under the current working directory. Each root contains the tool's `rocketchat-cli` directory. Without `--target`, install/update select every target whose root parent already exists in that scope, falling back to `agents` if none are detected. Use `--target claude|codex|cursor|opencode|agents` on install, update, or remove to select one target.
+
+Install/update replace only the tool's own `rocketchat-cli` skill directory, including any local edits or stale files, never the agent root or other skills. Remove deletes existing copies in the selected scope (all targets unless specified); absent copies and unknown removal targets are no-ops. Unknown install/update targets error. `skill list --json` reports all five targets and their installation status. Running `rocketchat skill` without a child displays help.
 
 Agents should normally use `--json`.
 
