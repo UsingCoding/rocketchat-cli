@@ -1,27 +1,50 @@
 [tools]
 go = "1.27"
-goreleaser = "latest"
+golangci-lint = "2.13.2"
+goreleaser = "2.18.0"
 
 [tasks.fmt]
-description = "Format Go code"
-run = "gofmt -w ."
+description = "Format Go sources"
+run = "gofmt -w $(find . -name '*.go' -type f)"
+
+[tasks."fmt:check"]
+description = "Verify Go formatting"
+run = '''
+files="$(gofmt -l $(find . -name '*.go' -type f))"
+if [ -n "$files" ]; then
+  echo "$files"
+  exit 1
+fi
+'''
 
 [tasks.test]
 description = "Run tests"
 run = "go test ./..."
 
 [tasks.lint]
-description = "Run go vet"
-run = "go vet ./..."
+description = "Run golangci-lint"
+run = "golangci-lint run ./..."
 
 [tasks.build]
-description = "Build rocketchat"
-run = "mkdir -p bin && go build -trimpath -o bin/rocketchat ."
+description = "Build the CLI"
+run = "go build -o ./bin/rocketchat ."
 
 [tasks.install]
-description = "Install rocketchat into GOPATH/bin"
-run = "go install ."
+description = "Install the CLI into GOPATH/bin"
+run = "go build -o \"$(go env GOPATH)/bin/rocketchat\" ."
 
-[tasks.release]
-description = "Create a GoReleaser release"
-run = "goreleaser release --clean"
+[tasks."test:race"]
+description = "Run tests with race detector"
+run = "go test -race ./..."
+
+[tasks.coverage]
+description = "Generate coverage report"
+run = "go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out"
+
+[tasks."release:snapshot"]
+description = "Build a local GoReleaser snapshot"
+run = "goreleaser release --snapshot --clean"
+
+[tasks.ci]
+description = "Run the local CI suite"
+depends = ["fmt:check", "lint", "test", "test:race", "build"]
